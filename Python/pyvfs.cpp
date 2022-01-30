@@ -118,9 +118,14 @@ public:
 	bool solveStereoForwardMasked()
 	{
 		clock_t start = clock();
-		m_stereotgv->solveStereoForwardMasked();
+		int ret = m_stereotgv->solveStereoForwardMasked();
 		clock_t timeElapsed = (clock() - start);
 		std::cout << "time: " << timeElapsed << " ms ";
+		if (ret != 0)
+		{
+			std::cerr << __FILE__ << " : " << __LINE__ << std::endl;
+			return false;
+		}
 
 		return true;
 	}
@@ -141,16 +146,31 @@ public:
 
 		cv::Mat depth = cv::Mat(m_stereoHeight, m_stereoWidth, CV_32F);
 		cv::Mat X = cv::Mat(m_stereoHeight, m_stereoWidth, CV_32FC3);
-		m_stereotgv->copyStereoToHost(depth, X, focalx, focaly,
+		int ret = m_stereotgv->copyStereoToHost(depth, X, focalx, focaly,
 			cx, cy,
 			d0, d1, d2, d3,
 			tx, ty, tz);
+		if (ret != 0)
+		{
+			std::cerr << __FILE__ << " : " << __LINE__ << std::endl;
+			return py::object();
+		}
 
 		cv::Mat disparity = cv::Mat(m_stereoHeight, m_stereoWidth, CV_32FC2);
-		m_stereotgv->copyDisparityToHost(disparity);
+		ret = m_stereotgv->copyDisparityToHost(disparity);
+		if (ret != 0)
+		{
+			std::cerr << __FILE__ << " : " << __LINE__ << std::endl;
+			return py::object();
+		}
 
 		cv::Mat uvrgb = cv::Mat(m_stereoHeight, m_stereoWidth, CV_32FC3);
-		m_stereotgv->copyDisparityVisToHost(uvrgb, 40.0f);
+		ret = m_stereotgv->copyDisparityVisToHost(uvrgb, 40.0f);
+		if (ret != 0)
+		{
+			std::cerr << __FILE__ << " : " << __LINE__ << std::endl;
+			return py::object();
+		}
 
 		// copy depth
 		np::ndarray depthArr = np::empty(py::make_tuple(depth.rows, depth.cols), np::dtype::get_builtin<float>());
