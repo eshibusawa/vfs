@@ -13,14 +13,7 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib
 # CUDA Toolkit
 find_package(CUDAToolkit)
 if(CUDAToolkit_FOUND)
-	message("   CUDA Toolkit enabled")
-endif()
-
-# OpenCV
-set(OpenCV_DIR "/path/to/opencv/lib/cmake/opencv4/")
-find_package(OpenCV REQUIRED)
-if(OpenCV_INCLUDE_DIRS)
-	message("   OpenCV enabled")
+	message(STATUS "CUDA Toolkit enabled")
 endif()
 
 # Python / Anaconda
@@ -29,11 +22,23 @@ string(REPLACE "." "" PYTHON_VERSION_REP ${PYTHON_VERSION})
 set(ANACONDA_ROOT "/path/to/anaconda3/envs/your-env")
 
 set(BOOST_PYTHON_LIBS python${PYTHON_VERSION}m boost_python${PYTHON_VERSION_REP} boost_numpy${PYTHON_VERSION_REP})
+foreach(LIB IN LISTS BOOST_PYTHON_LIBS)
+	set(FOUND_LIB "FOUND_LIB-NOTFOUND")
+	find_library(FOUND_LIB ${LIB} PATHS ${ANACONDA_ROOT}/lib)
+	LIST(APPEND BOOST_PYTHON_LIBRARIES ${FOUND_LIB})
+endforeach()
 set(BOOST_PYTHON_INCLUDES ${ANACONDA_ROOT}/include ${ANACONDA_ROOT}/include/python${PYTHON_VERSION}m)
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 	set(CMAKE_INSTALL_PREFIX "${ANACONDA_ROOT}/lib/python3.6/site-packages" CACHE PATH "..." FORCE)
 endif()
-link_directories(${ANACONDA_ROOT}/lib)
+set(CMAKE_INSTALL_RPATH "${ANACONDA_ROOT}/lib" "${CMAKE_INSTALL_PREFIX}")
+
+# OpenCV
+set(OpenCV_DIR "${ANACONDA_ROOT}/lib/cmake/opencv4/")
+find_package(OpenCV REQUIRED)
+if(OpenCV_INCLUDE_DIRS)
+	message(STATUS "OpenCV enabled")
+endif()
 
 add_library(vfs SHARED
 	../stereotgv/stereotgv.cu
@@ -61,7 +66,6 @@ target_include_directories(vfs PRIVATE
 	${OpenCV_INCLUDE_DIRS}
 	)
 target_link_libraries(vfs ${CUDA_CUDART} ${OpenCV_LIBRARIES})
-set_target_properties(vfs PROPERTIES PREFIX "")
 set_target_properties(vfs PROPERTIES CUDA_ARCHITECTURES "61")
 install(TARGETS vfs DESTINATION .)
 
@@ -74,7 +78,19 @@ target_include_directories(vfs_main PRIVATE
 	${CUDAToolkit_LIBRARY_ROOT}/samples/common/inc/
 	${OpenCV_INCLUDE_DIRS}
 	)
-set_source_files_properties(main.cpp PROPERTIES LANGUAGE CXX)
 target_link_libraries(vfs_main vfs ${OpenCV_LIBRARIES})
-set_target_properties(vfs_main PROPERTIES PREFIX "")
 install(TARGETS vfs_main DESTINATION .)
+
+add_library(pyvfs SHARED
+	pyvfs.cpp
+	)
+target_include_directories(pyvfs PRIVATE
+	../
+	${BOOST_PYTHON_INCLUDES}
+	${CUDAToolkit_INCLUDE_DIR}
+	${CUDAToolkit_LIBRARY_ROOT}/samples/common/inc/
+	${OpenCV_INCLUDE_DIRS}
+	)
+target_link_libraries(pyvfs vfs ${BOOST_PYTHON_LIBRARIES} ${OpenCV_LIBRARIES})
+set_target_properties(pyvfs PROPERTIES PREFIX "")
+install(TARGETS pyvfs DESTINATION .)
