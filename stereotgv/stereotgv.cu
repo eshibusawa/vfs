@@ -29,16 +29,167 @@ void DEBUGIMAGE(std::string windowName, float2* deviceImage, int height, int str
 }
 
 
-StereoTgv::StereoTgv() {
+StereoTgv::StereoTgv() :
+	d_i0(NULL),
+	d_i1(NULL),
+	d_i1warp(NULL),
+	d_i08uc3(NULL),
+	d_i18uc3(NULL),
+	d_i08u(NULL),
+	d_i18u(NULL),
+	d_i0smooth(NULL),
+	d_i1smooth(NULL),
+	d_Iu(NULL),
+	d_Iz(NULL),
+	d_u(NULL),
+	d_du(NULL),
+	d_us(NULL),
+	d_depth(NULL),
+	d_warpUV(NULL),
+	d_warpUVs(NULL),
+	d_dwarpUV(NULL),
+	d_uvrgb(NULL),
+	d_fisheyeMask(NULL),
+	d_a(NULL),
+	d_b(NULL),
+	d_c(NULL),
+	d_etau(NULL),
+	d_etav1(NULL),
+	d_etav2(NULL),
+	d_p(NULL),
+	d_q(NULL),
+	d_u_(NULL),
+	d_u_s(NULL),
+	d_u_last(NULL),
+	d_v(NULL),
+	d_vs(NULL),
+	d_v_(NULL),
+	d_v_s(NULL),
+	d_gradv(NULL),
+	d_Tp(NULL),
+	d_tvForward(NULL),
+	d_tvBackward(NULL),
+	d_tv2(NULL),
+	d_cv(NULL),
+	d_i1calibrated(NULL),
+	d_X(NULL),
+	debug_depth(NULL)
+{
 	this->BlockHeight = 1;
 	this->BlockWidth = 32;
 	this->StrideAlignment = 32;
 }
 
-StereoTgv::StereoTgv(int blockWidth, int blockHeight, int strideAlignment) {
+StereoTgv::StereoTgv(int blockWidth, int blockHeight, int strideAlignment) :
+	d_i0(NULL),
+	d_i1(NULL),
+	d_i1warp(NULL),
+	d_i08uc3(NULL),
+	d_i18uc3(NULL),
+	d_i08u(NULL),
+	d_i18u(NULL),
+	d_i0smooth(NULL),
+	d_i1smooth(NULL),
+	d_Iu(NULL),
+	d_Iz(NULL),
+	d_u(NULL),
+	d_du(NULL),
+	d_us(NULL),
+	d_depth(NULL),
+	d_warpUV(NULL),
+	d_warpUVs(NULL),
+	d_dwarpUV(NULL),
+	d_uvrgb(NULL),
+	d_fisheyeMask(NULL),
+	d_a(NULL),
+	d_b(NULL),
+	d_c(NULL),
+	d_etau(NULL),
+	d_etav1(NULL),
+	d_etav2(NULL),
+	d_p(NULL),
+	d_q(NULL),
+	d_u_(NULL),
+	d_u_s(NULL),
+	d_u_last(NULL),
+	d_v(NULL),
+	d_vs(NULL),
+	d_v_(NULL),
+	d_v_s(NULL),
+	d_gradv(NULL),
+	d_Tp(NULL),
+	d_tvForward(NULL),
+	d_tvBackward(NULL),
+	d_tv2(NULL),
+	d_cv(NULL),
+	d_i1calibrated(NULL),
+	d_X(NULL),
+	debug_depth(NULL)
+{
 	this->BlockHeight = blockHeight;
 	this->BlockWidth = blockWidth;
 	this->StrideAlignment = strideAlignment;
+}
+
+StereoTgv::~StereoTgv() {
+	checkCudaErrors(cudaFree(d_uvrgb));
+	checkCudaErrors(cudaFree(debug_depth));
+	checkCudaErrors(cudaFree(d_X));
+	checkCudaErrors(cudaFree(d_Tp));
+	checkCudaErrors(cudaFree(d_gradv));
+	checkCudaErrors(cudaFree(d_v_s));
+	checkCudaErrors(cudaFree(d_v_));
+	checkCudaErrors(cudaFree(d_vs));
+	checkCudaErrors(cudaFree(d_v));
+	checkCudaErrors(cudaFree(d_u_s));
+	checkCudaErrors(cudaFree(d_u_last));
+	checkCudaErrors(cudaFree(d_u_));
+	checkCudaErrors(cudaFree(d_q));
+	checkCudaErrors(cudaFree(d_p));
+	checkCudaErrors(cudaFree(d_etav2));
+	checkCudaErrors(cudaFree(d_etav1));
+	checkCudaErrors(cudaFree(d_etau));
+	checkCudaErrors(cudaFree(d_c));
+	checkCudaErrors(cudaFree(d_b));
+	checkCudaErrors(cudaFree(d_a));
+	checkCudaErrors(cudaFree(d_i1calibrated));
+	checkCudaErrors(cudaFree(d_cv));
+	checkCudaErrors(cudaFree(d_tv2));
+	checkCudaErrors(cudaFree(d_tvBackward));
+	checkCudaErrors(cudaFree(d_tvForward));
+	checkCudaErrors(cudaFree(d_warpUVs));
+	checkCudaErrors(cudaFree(d_dwarpUV));
+	checkCudaErrors(cudaFree(d_warpUV));
+	checkCudaErrors(cudaFree(d_depth));
+	checkCudaErrors(cudaFree(d_us));
+	checkCudaErrors(cudaFree(d_du));
+	checkCudaErrors(cudaFree(d_u));
+	checkCudaErrors(cudaFree(d_Iz));
+	checkCudaErrors(cudaFree(d_Iu));
+	checkCudaErrors(cudaFree(d_i1smooth));
+	checkCudaErrors(cudaFree(d_i0smooth));
+	checkCudaErrors(cudaFree(d_i18uc3));
+	checkCudaErrors(cudaFree(d_i08uc3));
+	checkCudaErrors(cudaFree(d_i18u));
+	checkCudaErrors(cudaFree(d_i08u));
+	checkCudaErrors(cudaFree(d_i1warp));
+	checkCudaErrors(cudaFree(d_i1));
+	checkCudaErrors(cudaFree(d_i0));
+	for (size_t level = 0; level < pFisheyeMask.size(); level++) {
+		checkCudaErrors(cudaFree(pFisheyeMask[level]));
+	}
+	for (size_t level = 0; level < pTvBackward.size(); level++) {
+		checkCudaErrors(cudaFree(pTvBackward[level]));
+	}
+	for (size_t level = 0; level < pTvForward.size(); level++) {
+		checkCudaErrors(cudaFree(pTvForward[level]));
+	}
+	for (size_t level = 0; level < pI1.size(); level++) {
+		checkCudaErrors(cudaFree(pI1[level]));
+	}
+	for (size_t level = 0; level < pI0.size(); level++) {
+		checkCudaErrors(cudaFree(pI0[level]));
+	}
 }
 
 int StereoTgv::initialize(int width, int height, float beta, float gamma,
@@ -61,15 +212,15 @@ int StereoTgv::initialize(int width, int height, float beta, float gamma,
 	this->nWarpIters = nWarpIters;
 	this->nSolverIters = nSolverIters;
 
-	pI0 = std::vector<float*>(nLevels);
-	pI1 = std::vector<float*>(nLevels);
+	pI0 = std::vector<float*>(nLevels, NULL);
+	pI1 = std::vector<float*>(nLevels, NULL);
 	pW = std::vector<int>(nLevels);
 	pH = std::vector<int>(nLevels);
 	pS = std::vector<int>(nLevels);
 	pDataSize = std::vector<int>(nLevels);
-	pTvForward = std::vector<float2*>(nLevels);
-	pTvBackward = std::vector<float2*>(nLevels);
-	pFisheyeMask = std::vector<float*>(nLevels);
+	pTvForward = std::vector<float2*>(nLevels, NULL);
+	pTvBackward = std::vector<float2*>(nLevels, NULL);
+	pFisheyeMask = std::vector<float*>(nLevels, NULL);
 
 	int newHeight = height;
 	int newWidth = width;

@@ -15,7 +15,7 @@ class StereoTgv {
 public:
 	StereoTgv();
 	StereoTgv(int blockWidth, int blockHeight, int strideAlignment);
-	~StereoTgv() {};
+	~StereoTgv();
 
 	int BlockWidth, BlockHeight, StrideAlignment;
 
