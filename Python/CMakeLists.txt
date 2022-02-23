@@ -96,7 +96,7 @@ target_include_directories(vfs_main PRIVATE
 target_link_libraries(vfs_main vfs ${OpenCV_LIBRARIES})
 install(TARGETS vfs_main DESTINATION .)
 
-pybind11_add_module(pyvfs pyvfs.cpp)
+pybind11_add_module(pyvfs MODULE pyvfs.cpp)
 target_link_libraries(pyvfs PRIVATE vfs ${OpenCV_LIBRARIES})
 target_include_directories(pyvfs PRIVATE
 	../
@@ -104,5 +104,4 @@ target_include_directories(pyvfs PRIVATE
 	${CUDAToolkit_LIBRARY_ROOT}/samples/common/inc/
 	${OpenCV_INCLUDE_DIRS}
 	)
-set_target_properties(pyvfs PROPERTIES PREFIX "")
 install(TARGETS pyvfs DESTINATION .)
