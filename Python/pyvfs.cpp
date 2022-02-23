@@ -1,13 +1,38 @@
-#include <boost/python.hpp>
-#include <boost/python/numpy.hpp>
+// BSD 2-Clause License
+//
+// Copyright (c) 2022, Eijiro SHIBUSAWA
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are met:
+//
+// 1. Redistributions of source code must retain the above copyright notice, this
+//    list of conditions and the following disclaimer.
+//
+// 2. Redistributions in binary form must reproduce the above copyright notice,
+//    this list of conditions and the following disclaimer in the documentation
+//    and/or other materials provided with the distribution.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+// DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+// FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+// SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+// CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+// OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+#include <pybind11/pybind11.h>
+#include <pybind11/numpy.h>
 
 #include <stereotgv/stereotgv.h>
 #include <opencv2/core/core.hpp>
 
 #include <iostream>
 
-namespace py = boost::python;
-namespace np = boost::python::numpy;
+namespace py = pybind11;
 
 class VFS
 {
@@ -32,19 +57,19 @@ public:
 			std::cerr << __FILE__ << ":" << __LINE__ << std::endl;
 			return false;
 		}
-		const int stereoWidth = py::extract<int>(obj.attr("width"));
-		const int stereoHeight = py::extract<int>(obj.attr("height"));
-		const float beta = py::extract<float>(obj.attr("beta"));
-		const float gamma = py::extract<float>(obj.attr("gamma"));
-		const float alpha0 = py::extract<float>(obj.attr("alpha0"));
-		const float alpha1 = py::extract<float>(obj.attr("alpha1"));
-		const float timeStepLambda = py::extract<float>(obj.attr("timeStepLambda"));
-		const float lambda = py::extract<float>(obj.attr("Lambda"));
-		const int nLevel = py::extract<int>(obj.attr("nLevel"));
-		const float fScale = py::extract<float>(obj.attr("fScale"));
-		const int nWarpIters = py::extract<int>(obj.attr("nWarpIters"));
-		const int nSolverIters = py::extract<int>(obj.attr("nSolverIters"));
-		const float limitRange = py::extract<float>(obj.attr("limitRange"));
+		const int stereoWidth = obj.attr("width").cast<int>();
+		const int stereoHeight = obj.attr("height").cast<int>();
+		const float beta = obj.attr("beta").cast<float>();
+		const float gamma = obj.attr("gamma").cast<float>();
+		const float alpha0 = obj.attr("alpha0").cast<float>();
+		const float alpha1 = obj.attr("alpha1").cast<float>();
+		const float timeStepLambda = obj.attr("timeStepLambda").cast<float>();
+		const float lambda = obj.attr("Lambda").cast<float>();
+		const int nLevel = obj.attr("nLevel").cast<int>();
+		const float fScale = obj.attr("fScale").cast<float>();
+		const int nWarpIters = obj.attr("nWarpIters").cast<int>();
+		const int nSolverIters = obj.attr("nSolverIters").cast<int>();
+		const float limitRange = obj.attr("limitRange").cast<float>();
 		m_stereotgv->limitRange = limitRange;
 		int ret = m_stereotgv->initialize(stereoWidth, stereoHeight, beta, gamma, alpha0, alpha1,
 			timeStepLambda, lambda, nLevel, fScale, nWarpIters, nSolverIters);
@@ -55,62 +80,55 @@ public:
 		return ret == 0;
 	}
 
-	bool copyMaskToDevice(const np::ndarray &mask)
+	bool copyMaskToDevice(const py::array_t<float> &mask)
 	{
-		const int nd = mask.get_nd();
-		auto ps = mask.get_shape();
-		if ((nd != 2) || (!(mask.get_flags() & np::ndarray::C_CONTIGUOUS)) ||
-				(mask.get_dtype() != np::dtype::get_builtin<float>()))
+		py::buffer_info buf = mask.request();
+		auto floatType = py::dtype::of<float>();
+		if ((buf.ndim != 2) || !floatType.is(mask.dtype()))
 		{
 			std::cerr << __FILE__ << " : " << __LINE__ << std::endl;
 			return false;
 		}
 
-		cv::Mat fisheyeMask(ps[0], ps[1], CV_32F, mask.get_data());
+		cv::Mat fisheyeMask(buf.shape[0], buf.shape[1], CV_32F, buf.ptr);
 		int ret = m_stereotgv->copyMaskToDevice(fisheyeMask);
 		return ret == 0;
 	}
 
-	bool loadVectorFields(const np::ndarray &translationArr, const np::ndarray &calibrationArr)
+	bool loadVectorFields(const py::array_t<float> &translationArr, const py::array_t<float> &calibrationArr)
 	{
-		const int nd1 = translationArr.get_nd();
-		auto ps1 = translationArr.get_shape();
-		const int nd2 = calibrationArr.get_nd();
-		auto ps2 = calibrationArr.get_shape();
+		py::buffer_info buf1 = translationArr.request();
+		py::buffer_info buf2 = calibrationArr.request();
+		auto floatType = py::dtype::of<float>();
 
-		if ((nd1 != 3) || (!(translationArr.get_flags() & np::ndarray::C_CONTIGUOUS)) ||
-				(translationArr.get_dtype() != np::dtype::get_builtin<float>()) ||
-			(nd2 != 3) || (!(calibrationArr.get_flags() & np::ndarray::C_CONTIGUOUS)) ||
-							(calibrationArr.get_dtype() != np::dtype::get_builtin<float>()))
+		if ((buf1.ndim != 3) || !floatType.is(translationArr.dtype()) ||
+			(buf2.ndim != 3) || !floatType.is(calibrationArr.dtype()))
 		{
 			std::cerr << __FILE__ << " : " << __LINE__ << std::endl;
 			return false;
 		}
 
-		cv::Mat translationVector(ps1[0], ps1[1], CV_32FC2, translationArr.get_data());
-		cv::Mat calibrationVector(ps2[0], ps2[1], CV_32FC2, calibrationArr.get_data());
+		cv::Mat translationVector(buf1.shape[0], buf1.shape[1], CV_32FC2, buf1.ptr);
+		cv::Mat calibrationVector(buf2.shape[0], buf2.shape[1], CV_32FC2, buf2.ptr);
 		int ret = m_stereotgv->loadVectorFields(translationVector, calibrationVector);
 		return ret == 0;
 	}
 
-	bool copyImagesToDevice(const np::ndarray &arr1, const np::ndarray &arr2)
+	bool copyImagesToDevice(const py::array_t<unsigned char> &arr1, const py::array_t<unsigned char> &arr2)
 	{
-		const int nd1 = arr1.get_nd();
-		auto ps1 = arr1.get_shape();
-		const int nd2 = arr2.get_nd();
-		auto ps2 = arr2.get_shape();
+		py::buffer_info buf1 = arr1.request();
+		py::buffer_info buf2 = arr2.request();
+		auto ucharType = py::dtype::of<unsigned char>();
 
-		if ((nd1 != 2) || (!(arr1.get_flags() & np::ndarray::C_CONTIGUOUS)) ||
-				(arr1.get_dtype() != np::dtype::get_builtin<unsigned char>()) ||
-			(nd2 != 2) || (!(arr2.get_flags() & np::ndarray::C_CONTIGUOUS)) ||
-							(arr2.get_dtype() != np::dtype::get_builtin<unsigned char>()))
+		if ((buf1.ndim != 2) || !ucharType.is(arr1.dtype()) ||
+			(buf2.ndim != 2) || !ucharType.is(arr2.dtype()))
 		{
 				std::cerr << __FILE__ << " : " << __LINE__ << std::endl;
 				return false;
 		}
 
-		cv::Mat mat1(ps1[0], ps1[1], CV_8U, arr1.get_data());
-		cv::Mat mat2(ps2[0], ps2[1], CV_8U, arr2.get_data());
+		cv::Mat mat1(buf1.shape[0], buf1.shape[1], CV_8U, buf1.ptr);
+		cv::Mat mat2(buf2.shape[0], buf2.shape[1], CV_8U, buf2.ptr);
 		int ret = m_stereotgv->copyImagesToDevice(mat1, mat2);
 		return ret == 0;
 	}
@@ -132,17 +150,17 @@ public:
 
 	py::object copyResultToHost(const py::object &obj)
 	{
-		const float focalx = py::extract<float>(obj.attr("focalx"));
-		const float focaly = py::extract<float>(obj.attr("focaly"));
-		const float cx = py::extract<float>(obj.attr("cx"));
-		const float cy = py::extract<float>(obj.attr("cy"));
-		const float d0 = py::extract<float>(obj.attr("d0"));
-		const float d1 = py::extract<float>(obj.attr("d1"));
-		const float d2 = py::extract<float>(obj.attr("d2"));
-		const float d3 = py::extract<float>(obj.attr("d3"));
-		const float tx = py::extract<float>(obj.attr("tx"));
-		const float ty = py::extract<float>(obj.attr("ty"));
-		const float tz = py::extract<float>(obj.attr("tz"));
+		const float focalx = obj.attr("focalx").cast<float>();
+		const float focaly = obj.attr("focaly").cast<float>();
+		const float cx = obj.attr("cx").cast<float>();
+		const float cy = obj.attr("cy").cast<float>();
+		const float d0 = obj.attr("d0").cast<float>();
+		const float d1 = obj.attr("d1").cast<float>();
+		const float d2 = obj.attr("d2").cast<float>();
+		const float d3 = obj.attr("d3").cast<float>();
+		const float tx = obj.attr("tx").cast<float>();
+		const float ty = obj.attr("ty").cast<float>();
+		const float tz = obj.attr("tz").cast<float>();
 
 		cv::Mat depth = cv::Mat(m_stereoHeight, m_stereoWidth, CV_32F);
 		cv::Mat X = cv::Mat(m_stereoHeight, m_stereoWidth, CV_32FC3);
@@ -153,7 +171,7 @@ public:
 		if (ret != 0)
 		{
 			std::cerr << __FILE__ << " : " << __LINE__ << std::endl;
-			return py::object();
+			return py::none();
 		}
 
 		cv::Mat disparity = cv::Mat(m_stereoHeight, m_stereoWidth, CV_32FC2);
@@ -161,7 +179,7 @@ public:
 		if (ret != 0)
 		{
 			std::cerr << __FILE__ << " : " << __LINE__ << std::endl;
-			return py::object();
+			return py::none();
 		}
 
 		cv::Mat uvrgb = cv::Mat(m_stereoHeight, m_stereoWidth, CV_32FC3);
@@ -169,24 +187,28 @@ public:
 		if (ret != 0)
 		{
 			std::cerr << __FILE__ << " : " << __LINE__ << std::endl;
-			return py::object();
+			return py::none();
 		}
 
 		// copy depth
-		np::ndarray depthArr = np::empty(py::make_tuple(depth.rows, depth.cols), np::dtype::get_builtin<float>());
-		float *pDepthArr = reinterpret_cast<float *>(depthArr.get_data());
+		auto depthArr = py::array_t<float, py::array::c_style>({depth.rows, depth.cols});
+		py::buffer_info depthBuf = depthArr.request();
+		float *pDepthArr = reinterpret_cast<float *>(depthBuf.ptr);
 		depth.copyTo(cv::Mat(depth.rows, depth.cols, CV_32F, pDepthArr));
 		// copy X
-		np::ndarray xArr = np::empty(py::make_tuple(X.rows, X.cols, 3), np::dtype::get_builtin<float>());
-		float *pXArr = reinterpret_cast<float *>(xArr.get_data());
+		auto xArr = py::array_t<float, py::array::c_style>({X.rows, X.cols, 3});
+		py::buffer_info xBuf = xArr.request();
+		float *pXArr = reinterpret_cast<float *>(xBuf.ptr);
 		X.copyTo(cv::Mat(X.rows, X.cols, CV_32FC3, pXArr));
 		// copy disparity
-		np::ndarray disparityArr = np::empty(py::make_tuple(disparity.rows, disparity.cols, 2), np::dtype::get_builtin<float>());
-		float *pDisparityArr = reinterpret_cast<float *>(disparityArr.get_data());
+		auto disparityArr = py::array_t<float, py::array::c_style>({disparity.rows, disparity.cols, 2});
+		py::buffer_info disparityBuf = disparityArr.request();
+		float *pDisparityArr = reinterpret_cast<float *>(disparityBuf.ptr);
 		disparity.copyTo(cv::Mat(disparity.rows, disparity.cols, CV_32FC2, pDisparityArr));
 		// copy UV RGB
-		np::ndarray uvrgbArr = np::empty(py::make_tuple(uvrgb.rows, uvrgb.cols, 3), np::dtype::get_builtin<float>());
-		float *pUvrgbArr = reinterpret_cast<float *>(uvrgbArr.get_data());
+		auto uvrgbArr = py::array_t<float, py::array::c_style>({uvrgb.rows, uvrgb.cols, 3});
+		py::buffer_info uvrgbBuf = uvrgbArr.request();
+		float *pUvrgbArr = reinterpret_cast<float *>(uvrgbBuf.ptr);
 		uvrgb.copyTo(cv::Mat(uvrgb.rows, uvrgb.cols, CV_32FC3, pUvrgbArr));
 
 		return py::make_tuple(depthArr, xArr, disparityArr, uvrgbArr);
@@ -199,16 +221,16 @@ private:
 	int m_stereoHeight;
 };
 
-BOOST_PYTHON_MODULE(pyvfs)
+PYBIND11_MODULE(pyvfs, m)
 {
-	Py_Initialize();
-	np::initialize();
-	py::class_<VFS>("vfs")
+	py::class_<VFS> vfs(m, "vfs");
+
+	vfs.def(py::init<>())
 		.def("initialize", &VFS::initialize)
 		.def("copy_mask_to_device", &VFS::copyMaskToDevice)
 		.def("load_vector_fields", &VFS::loadVectorFields)
 		.def("copy_images_to_device", &VFS::copyImagesToDevice)
 		.def("solve_stereo_forward_masked", &VFS::solveStereoForwardMasked)
 		.def("copy_result_to_host", &VFS::copyResultToHost)
-	;
+		;
 }

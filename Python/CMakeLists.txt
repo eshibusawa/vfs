@@ -1,3 +1,29 @@
+# BSD 2-Clause License
+#
+# Copyright (c) 2022, Eijiro SHIBUSAWA
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# 1. Redistributions of source code must retain the above copyright notice, this
+#    list of conditions and the following disclaimer.
+#
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+#    this list of conditions and the following disclaimer in the documentation
+#    and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 cmake_minimum_required(VERSION 3.18)
 
 project(VFSPython CUDA CXX)
@@ -7,9 +33,6 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0")
 
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib
-	CACHE PATH "Output directory for libraries.")
-
 # CUDA Toolkit
 find_package(CUDAToolkit)
 if(CUDAToolkit_FOUND)
@@ -17,24 +40,16 @@ if(CUDAToolkit_FOUND)
 endif()
 
 # Python / Anaconda
-set(PYTHON_VERSION 3.6)
-string(REPLACE "." "" PYTHON_VERSION_REP ${PYTHON_VERSION})
-set(ANACONDA_ROOT "/path/to/anaconda3/envs/your-env")
+find_package(Python COMPONENTS Interpreter Development)
+set(pybind11_DIR "${Python_SITELIB}/pybind11/share/cmake/pybind11")
+find_package(pybind11 CONFIG REQUIRED)
 
-set(BOOST_PYTHON_LIBS python${PYTHON_VERSION}m boost_python${PYTHON_VERSION_REP} boost_numpy${PYTHON_VERSION_REP})
-foreach(LIB IN LISTS BOOST_PYTHON_LIBS)
-	set(FOUND_LIB "FOUND_LIB-NOTFOUND")
-	find_library(FOUND_LIB ${LIB} PATHS ${ANACONDA_ROOT}/lib)
-	LIST(APPEND BOOST_PYTHON_LIBRARIES ${FOUND_LIB})
-endforeach()
-set(BOOST_PYTHON_INCLUDES ${ANACONDA_ROOT}/include ${ANACONDA_ROOT}/include/python${PYTHON_VERSION}m)
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-	set(CMAKE_INSTALL_PREFIX "${ANACONDA_ROOT}/lib/python3.6/site-packages" CACHE PATH "..." FORCE)
+	set(CMAKE_INSTALL_PREFIX "${Python_SITELIB}" CACHE PATH "..." FORCE)
 endif()
-set(CMAKE_INSTALL_RPATH "${ANACONDA_ROOT}/lib" "${CMAKE_INSTALL_PREFIX}")
+set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}")
 
 # OpenCV
-set(OpenCV_DIR "${ANACONDA_ROOT}/lib/cmake/opencv4/")
 find_package(OpenCV REQUIRED)
 if(OpenCV_INCLUDE_DIRS)
 	message(STATUS "OpenCV enabled")
@@ -81,16 +96,13 @@ target_include_directories(vfs_main PRIVATE
 target_link_libraries(vfs_main vfs ${OpenCV_LIBRARIES})
 install(TARGETS vfs_main DESTINATION .)
 
-add_library(pyvfs SHARED
-	pyvfs.cpp
-	)
+pybind11_add_module(pyvfs pyvfs.cpp)
+target_link_libraries(pyvfs PRIVATE vfs ${OpenCV_LIBRARIES})
 target_include_directories(pyvfs PRIVATE
 	../
-	${BOOST_PYTHON_INCLUDES}
 	${CUDAToolkit_INCLUDE_DIR}
 	${CUDAToolkit_LIBRARY_ROOT}/samples/common/inc/
 	${OpenCV_INCLUDE_DIRS}
 	)
-target_link_libraries(pyvfs vfs ${BOOST_PYTHON_LIBRARIES} ${OpenCV_LIBRARIES})
 set_target_properties(pyvfs PROPERTIES PREFIX "")
 install(TARGETS pyvfs DESTINATION .)
