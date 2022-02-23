@@ -80,11 +80,11 @@ public:
 		return ret == 0;
 	}
 
-	bool copyMaskToDevice(const py::array_t<float> &mask)
+	bool copyMaskToDevice(const py::array &mask)
 	{
 		py::buffer_info buf = mask.request();
-		auto floatType = py::dtype::of<float>();
-		if ((buf.ndim != 2) || !floatType.is(mask.dtype()))
+		if ((buf.ndim != 2) || (buf.strides[0] != buf.shape[1] * sizeof(float)) ||
+			(buf.format != py::format_descriptor<float>::format()))
 		{
 			std::cerr << __FILE__ << " : " << __LINE__ << std::endl;
 			return false;
@@ -95,14 +95,15 @@ public:
 		return ret == 0;
 	}
 
-	bool loadVectorFields(const py::array_t<float> &translationArr, const py::array_t<float> &calibrationArr)
+	bool loadVectorFields(const py::array &translationArr, const py::array &calibrationArr)
 	{
 		py::buffer_info buf1 = translationArr.request();
 		py::buffer_info buf2 = calibrationArr.request();
-		auto floatType = py::dtype::of<float>();
-
-		if ((buf1.ndim != 3) || !floatType.is(translationArr.dtype()) ||
-			(buf2.ndim != 3) || !floatType.is(calibrationArr.dtype()))
+		if ((buf1.ndim != 3) || (buf1.strides[0] != 2 * buf1.shape[1] * sizeof(float)) ||
+			(buf1.format != py::format_descriptor<float>::format()) ||
+			(buf2.ndim != 3) || (buf2.strides[0] != 2 * buf2.shape[1] * sizeof(float)) ||
+			(buf2.format != buf1.format)
+			)
 		{
 			std::cerr << __FILE__ << " : " << __LINE__ << std::endl;
 			return false;
@@ -114,17 +115,18 @@ public:
 		return ret == 0;
 	}
 
-	bool copyImagesToDevice(const py::array_t<unsigned char> &arr1, const py::array_t<unsigned char> &arr2)
+	bool copyImagesToDevice(const py::array &arr1, const py::array &arr2)
 	{
 		py::buffer_info buf1 = arr1.request();
 		py::buffer_info buf2 = arr2.request();
-		auto ucharType = py::dtype::of<unsigned char>();
-
-		if ((buf1.ndim != 2) || !ucharType.is(arr1.dtype()) ||
-			(buf2.ndim != 2) || !ucharType.is(arr2.dtype()))
+		if ((buf1.ndim != 2) || (buf1.strides[0] != buf1.shape[1] * sizeof(unsigned char)) ||
+			(buf1.format != py::format_descriptor<unsigned char>::format()) ||
+			(buf2.ndim != 2) || (buf2.strides[0] != buf2.shape[1] * sizeof(unsigned char)) ||
+			(buf2.format != buf1.format)
+			)
 		{
-				std::cerr << __FILE__ << " : " << __LINE__ << std::endl;
-				return false;
+			std::cerr << __FILE__ << " : " << __LINE__ << std::endl;
+			return false;
 		}
 
 		cv::Mat mat1(buf1.shape[0], buf1.shape[1], CV_8U, buf1.ptr);
